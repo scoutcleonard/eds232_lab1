@@ -63,6 +63,18 @@ readr::write_csv(df, obs_csv)
 geojsonio::geojson_write(obs, file = "data/sdm/obs.geojson")
 
 # show points on map
-mapview::mapview(obs$geometry, map.types = "Esri.WorldGrayCanvas")
+mapview::mapview(obs$geometry, map.types = "Esri.OceanBasemap")
 ```
+
+**Question 1: How many observations total are in GBIF for your species?**
+
+```{r}
+res
+```
+
+There are 8,561 total observations in GBIF for _Limulus polyphemus_.
+
+**Question 2: Do you see any odd observations, like marine species on land or vice versa? If so, please see the Data Cleaning and explain what you did to fix or remove these points.**
+
+There were 3 observations that were extremely inland for a coastal marine species and one observation in the Pacific Ocean. 
 
