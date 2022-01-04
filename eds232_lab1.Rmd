@@ -1,0 +1,68 @@
+---
+title: 'Machine Learning: Lab 1'
+author: "Scout Leonard"
+date: "1/3/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 2.1 Install Packages
+
+```{r}
+# load packages, installing if missing
+if (!require(librarian)){
+  install.packages("librarian")
+  library(librarian)
+}
+librarian::shelf(
+  dismo, dplyr, DT, ggplot2, here, htmltools, leaflet, mapview, purrr, raster, readr, rgbif, rgdal, rJava, sdmpredictors, sf, spocc, tidyr, geojsonio)
+select <- dplyr::select # overwrite raster::select
+
+# set random seed for reproducibility
+set.seed(42)
+
+# directory to store data
+dir_data <- here("data/sdm")
+dir.create(dir_data, showWarnings = F)
+```
+
+## 2.2 Choose a Species
+
+I chose the **Atlantic Horseshoe Crab**, _Limulus polyphemus_.
+
+## 2.3 Get Species Observations
+
+```{r}
+obs_csv <- file.path(dir_data, "obs.csv")
+obs_geo <- file.path(dir_data, "obs.geojson")
+
+# get species occurrence data from GBIF with coordinates
+(res <- spocc::occ(
+  query = 'Limulus polyphemus', 
+  from = 'gbif', has_coords = T,
+  limit = 10000))
+```
+
+```{r}
+# extract data frame from result
+df <- res$gbif$data[[1]] 
+nrow(df) # number of rows
+```
+
+```{r}
+# convert to points of observation from lon/lat columns in data frame
+obs <- df %>% 
+  sf::st_as_sf(
+    coords = c("longitude", "latitude"),
+    crs = st_crs(4326))
+
+readr::write_csv(df, obs_csv)
+geojsonio::geojson_write(obs, file = "data/sdm/obs.geojson")
+
+# show points on map
+mapview::mapview(obs, map.types = " Stadia.AlidadeSmooth")
+```
+
