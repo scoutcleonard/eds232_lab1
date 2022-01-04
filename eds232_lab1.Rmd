@@ -63,6 +63,6 @@ readr::write_csv(df, obs_csv)
 geojsonio::geojson_write(obs, file = "data/sdm/obs.geojson")
 
 # show points on map
-mapview::mapview(obs, map.types = " Stadia.AlidadeSmooth")
+mapview::mapview(obs$geometry, map.types = "Esri.WorldGrayCanvas")
 ```
 
