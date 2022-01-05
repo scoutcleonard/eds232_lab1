@@ -53,6 +53,12 @@ nrow(df) # number of rows
 ```
 
 ```{r}
+df <- df %>% 
+  filter(key != 2873906100) %>% #indiana outlier
+  filter(key != 3384771597) %>% #california outlier
+  filter(key != 3398866235) %>% #south carolina northerly outlier
+  filter(key != 3302425640) #virginia westerly outlier
+
 # convert to points of observation from lon/lat columns in data frame
 obs <- df %>% 
   sf::st_as_sf(
@@ -76,5 +82,7 @@ There are 8,561 total observations in GBIF for _Limulus polyphemus_.
 
 **Question 2: Do you see any odd observations, like marine species on land or vice versa? If so, please see the Data Cleaning and explain what you did to fix or remove these points.**
 
-There were 3 observations that were extremely inland for a coastal marine species and one observation in the Pacific Ocean. 
+There were 3 observations that were extremely inland for a coastal marine species and one observation in the Pacific Ocean. I filtered them from my dataframe by clicking the outliers, finding the row they appear in, and retrieving their identifier from the `key` column. I filter based on that for the 4 odd observations and was able to return a more reasonable map based on what I know about Atlantic Horseshoe Crabs. 
+
+
 
