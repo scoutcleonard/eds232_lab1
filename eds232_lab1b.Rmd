@@ -1,0 +1,28 @@
+---
+title: 'Machine Learning: Lab 1b'
+author: "Scout Leonard"
+date: "1/5/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+librarian::shelf(
+  DT, dplyr, dismo, GGally, here, readr, tidyr)
+select <- dplyr::select # overwrite raster::select
+options(readr.show_col_types = F)
+
+dir_data    <- here("data/sdm")
+pts_env_csv <- file.path(dir_data, "pts_env.csv")
+
+pts_env <- read_csv(pts_env_csv)
+nrow(pts_env)
+```
+
+```{r}
+datatable(pts_env, rownames = F)
+```
+
