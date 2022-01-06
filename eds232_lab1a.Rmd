@@ -8,7 +8,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```
 
 ## 2.1 Install Packages
@@ -55,24 +55,11 @@ nrow(df) # number of rows
 ```
 
 ```{r}
+#remove odd observations
 df <- df %>% 
-  filter(key != 2873906100) %>% #indiana outlier
-  filter(key != 3384771597) %>% #california outlier
+  filter(!stateProvince %in% c("Indiana", "California")) %>% #california and indiana outlier
   filter(key != 3398866235) %>% #south carolina northerly outlier
   filter(key != 3302425640) #virginia westerly outlier
-
-#testing weird filter results
-df_test <- df %>% 
-  filter(stateProvince != "Indiana") %>% \
-
-#testing weird filter results
-df_test3 <- df %>% 
-  filter(!stateProvince %in% c("Indiana", "California"))
-  
-
-#testing weird filter results
-df_test2 <- df %>% 
-  filter(stateProvince == "Indiana")
 
 # convert to points of observation from lon/lat columns in data frame
 obs <- df %>% 
@@ -143,11 +130,13 @@ obs_hull_geo <- file.path(dir_data, "obs_hull.geojson")
 
 # make convex hull around points of observation
 obs_hull <- sf::st_convex_hull(st_union(obs))
-
-# show points on map
-mapview(
-  list(obs, obs_hull))
 ```
+
+```{r}
+# show points on map
+mapview(list(obs$geometry, obs_hull))
+```
+
 
 ```{r}
 # save obs hull
@@ -157,8 +146,10 @@ obs_hull_sp <- sf::as_Spatial(obs_hull)
 
 env_stack <- raster::mask(env_stack, obs_hull_sp) %>% 
   raster::crop(extent(obs_hull_sp))
+```
 
-mapview(obs) + 
+```{r}
+mapview(obs$geometry) + 
   mapview(env_stack, hide = T)
 ```
 
@@ -173,7 +164,7 @@ pts_env_csv <- file.path(dir_data, "pts_env.csv")
 r_obs <- rasterize(
   sf::as_Spatial(obs), env_stack[[1]], field=1, fun='count')
 
-mapview(obs) + 
+mapview(obs$geometry) + 
   mapview(r_obs)
 ```
 
@@ -185,8 +176,8 @@ absence <- dismo::randomPoints(r_mask, nrow(obs)) %>%
   as_tibble() %>% 
   st_as_sf(coords = c("x", "y"), crs = 4326)
 
-mapview(obs, col.regions = "green") + 
-  mapview(absence, col.regions = "gray"
+mapview(obs$geometry, col.regions = "green") + 
+  mapview(absence, col.regions = "gray")
 ```
 
 ```{r}
