@@ -127,3 +127,42 @@ p3 <- partial(mdl_caret, pred.var = c("lat", "WC_bio2")) %>%
 gridExtra::grid.arrange(p1, p2, p3, ncol = 3)
 ```
 
+# 2. Random Forests
+
+```{r}
+# load additional packages
+librarian::shelf(
+  ranger)  # random forest modeling
+```
+
+## 2.1 Fit
+
+```{r}
+# number of features
+n_features <- length(setdiff(names(d_train), "present"))
+
+# fit a default random forest model
+mdl_rf <- ranger(present ~ ., data = d_train)
+
+# get out of the box RMSE
+(default_rmse <- sqrt(mdl_rf$prediction.error))
+```
+
+## 2.2 Feature Interpretation
+
+```{r}
+# re-run model with impurity-based variable importance
+mdl_impurity <- ranger(
+  present ~ ., data = d_train,
+  importance = "impurity")
+
+# re-run model with permutation-based variable importance
+mdl_permutation <- ranger(
+  present ~ ., data = d_train,
+  importance = "permutation")
+p1 <- vip::vip(mdl_impurity, bar = FALSE)
+p2 <- vip::vip(mdl_permutation, bar = FALSE)
+
+gridExtra::grid.arrange(p1, p2, nrow = 1)
+```
+
