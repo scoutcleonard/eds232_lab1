@@ -20,8 +20,9 @@ if (!require(librarian)){
   library(librarian)
 }
 librarian::shelf(
-  dismo, dplyr, DT, ggplot2, here, htmltools, leaflet, mapview, purrr, raster, readr, rgbif, rgdal, rJava, sdmpredictors, sf, spocc, tidyr, geojsonio)
+  dismo, dplyr, DT, ggplot2, here, htmltools, leaflet, mapview, purrr, raster, readr, rgbif, rgdal, rJava, sdmpredictors, sf, spocc, tidyr)
 select <- dplyr::select # overwrite raster::select
+options(readr.show_col_types = FALSE)
 
 # set random seed for reproducibility
 set.seed(42)
@@ -30,6 +31,7 @@ set.seed(42)
 dir_data <- here("data/sdm")
 dir.create(dir_data, showWarnings = F, recursive = T)
 ```
+
 
 ## 2.2 Choose a Species
 
@@ -40,36 +42,38 @@ I chose the **Atlantic Horseshoe Crab**, _Limulus polyphemus_.
 ```{r}
 obs_csv <- file.path(dir_data, "obs.csv")
 obs_geo <- file.path(dir_data, "obs.geojson")
+redo    <- FALSE
 
-# get species occurrence data from GBIF with coordinates
-(res <- spocc::occ(
-  query = 'Limulus polyphemus', 
-  from = 'gbif', has_coords = T,
-  limit = 10000))
-```
-
-```{r}
-# extract data frame from result
-df <- res$gbif$data[[1]] 
-nrow(df) # number of rows
-```
-
-```{r}
-#remove odd observations
-df <- df %>% 
+if (!file.exists(obs_geo) | redo){
+  # get species occurrence data from GBIF with coordinates
+  (res <- spocc::occ(
+    query = 'Limulus polyphemus', 
+    from = 'gbif', has_coords = T,
+    limit = 10000))
+  
+  # extract data frame from result
+  df <- res$gbif$data[[1]] 
+  readr::write_csv(df, obs_csv)
+  
+  #clean df to remove odd observations
+  df <- df %>% 
   filter(!stateProvince %in% c("Indiana", "California")) %>% #california and indiana outlier
   filter(key != 3398866235) %>% #south carolina northerly outlier
   filter(key != 3302425640) #virginia westerly outlier
+  
+  # convert to points of observation from lon/lat columns in data frame
+  obs <- df %>% 
+    sf::st_as_sf(
+      coords = c("longitude", "latitude"),
+      crs = st_crs(4326)) %>% 
+    select(prov, key) # save space (joinable from obs_csv)
+  sf::write_sf(obs, obs_geo, delete_dsn=T)
+}
+obs <- sf::read_sf(obs_geo)
+nrow(obs) # number of rows
+```
 
-# convert to points of observation from lon/lat columns in data frame
-obs <- df %>% 
-  sf::st_as_sf(
-    coords = c("longitude", "latitude"),
-    crs = st_crs(4326))
-
-readr::write_csv(df, obs_csv)
-geojsonio::geojson_write(obs, file = "data/sdm/obs.geojson")
-
+```{r}
 # show points on map
 mapview::mapview(obs$geometry, map.types = "Esri.OceanBasemap")
 ```
@@ -80,7 +84,7 @@ mapview::mapview(obs$geometry, map.types = "Esri.OceanBasemap")
 res
 ```
 
-There are 8,561 total observations in GBIF for _Limulus polyphemus_.
+There are 8,557 total observations in GBIF for _Limulus polyphemus_.
 
 **Question 2: Do you see any odd observations, like marine species on land or vice versa? If so, please see the Data Cleaning and explain what you did to fix or remove these points.**
 
@@ -96,13 +100,14 @@ dir_env <- file.path(dir_data, "env")
 # set a default data directory
 options(sdmpredictors_datadir = dir_env)
 
-# choosing terrestrial and marine - because this species is coastal
-env_datasets <- sdmpredictors::list_datasets(terrestrial = TRUE, marine = TRUE)
+# choosing terrestrial
+env_datasets <- sdmpredictors::list_datasets(terrestrial = TRUE, marine = FALSE)
 
 # show table of datasets
 env_datasets %>% 
   select(dataset_code, description, citation) %>% 
   DT::datatable()
+
 ```
 
 ```{r}
@@ -122,7 +127,7 @@ env_layers_vec <- c("WC_alt", "WC_bio1", "WC_bio2", "ER_tri", "ER_topoWet")
 env_stack <- load_layers(env_layers_vec)
 
 # interactive plot layers, hiding all but first (select others)
-#mapview(env_stack, hide = T)
+# mapview(env_stack, hide = T) # makes the html too big for Github
 plot(env_stack, nc=2)
 ```
 
@@ -159,78 +164,86 @@ env_stack <- stack(env_stack_grd)
 plot(env_stack, nc=2)
 ```
 
-
-```{r}
-# show points on map
-mapview(list(obs$geometry, obs_hull))
-```
-
-### 2.4.2 Pseudo-Absence 
+### 2.4.2 Pseudo-Absence
 
 ```{r}
 absence_geo <- file.path(dir_data, "absence.geojson")
 pts_geo     <- file.path(dir_data, "pts.geojson")
 pts_env_csv <- file.path(dir_data, "pts_env.csv")
 
-# get raster count of observations
-r_obs <- rasterize(
-  sf::as_Spatial(obs), env_stack[[1]], field=1, fun='count')
+if (!file.exists(absence_geo) | redo){
+  # get raster count of observations
+  r_obs <- rasterize(
+    sf::as_Spatial(obs), env_stack[[1]], field=1, fun='count')
+  
+  # show map
+  # mapview(obs) + 
+  #   mapview(r_obs)
+  
+  # create mask for 
+  r_mask <- mask(env_stack[[1]] > -Inf, r_obs, inverse=T)
+  
+  # generate random points inside mask
+  absence <- dismo::randomPoints(r_mask, nrow(obs)) %>% 
+    as_tibble() %>% 
+    st_as_sf(coords = c("x", "y"), crs = 4326)
+  
+  write_sf(absence, absence_geo, delete_dsn=T)
+}
+absence <- read_sf(absence_geo)
 
-mapview(obs$geometry) + 
-  mapview(r_obs)
-```
-
-```{r}
-# create mask for 
-r_mask <- mask(env_stack[[1]] > -Inf, r_obs, inverse=T)
-
-absence <- dismo::randomPoints(r_mask, nrow(obs)) %>% 
-  as_tibble() %>% 
-  st_as_sf(coords = c("x", "y"), crs = 4326)
-
-mapview(obs$geometry, col.regions = "green") + 
+# show map of presence, ie obs, and absence
+mapview(obs, col.regions = "green") + 
   mapview(absence, col.regions = "gray")
 ```
 
 ```{r}
-# combine presence and absence into single set of labeled points 
-pts <- rbind(
-  obs %>% 
+if (!file.exists(pts_env_csv) | redo){
+
+  # combine presence and absence into single set of labeled points 
+  pts <- rbind(
+    obs %>% 
+      mutate(
+        present = 1) %>% 
+      select(present, key),
+    absence %>% 
+      mutate(
+        present = 0,
+        key     = NA)) %>% 
     mutate(
-      present = 1) %>% 
-    select(present),
-  absence %>% 
+      ID = 1:n()) %>% 
+    relocate(ID)
+  write_sf(pts, pts_geo, delete_dsn=T)
+
+  # extract raster values for points
+  pts_env <- raster::extract(env_stack, as_Spatial(pts), df=TRUE) %>% 
+    tibble() %>% 
+    # join present and geometry columns to raster value results for points
+    left_join(
+      pts %>% 
+        select(ID, present),
+      by = "ID") %>% 
+    relocate(present, .after = ID) %>% 
+    # extract lon, lat as single columns
     mutate(
-      present = 0)) %>% 
-  mutate(
-    ID = 1:n()) %>% 
-  relocate(ID)
-write_sf(pts, pts_geo)
+      #present = factor(present),
+      lon = st_coordinates(geometry)[,1],
+      lat = st_coordinates(geometry)[,2]) %>% 
+    select(-geometry)
+  write_csv(pts_env, pts_env_csv)
+}
+pts_env <- read_csv(pts_env_csv)
 
-# extract raster values for points
-pts_env <- raster::extract(env_stack, as_Spatial(pts), df=TRUE) %>% 
-  tibble() %>% 
-  # join present and geometry columns to raster value results for points
-  left_join(
-    pts %>% 
-      select(ID, present),
-    by = "ID") %>% 
-  relocate(present, .after = ID) %>% 
-  # extract lon, lat as single columns
-  mutate(
-    #present = factor(present),
-    lon = st_coordinates(geometry)[,1],
-    lat = st_coordinates(geometry)[,2]) %>% 
-  select(-geometry)
-
-write_csv(pts_env, pts_env_csv)
-```
-
-```{r}
 pts_env %>% 
-  select(-ID) %>% 
-  DT::datatable()
+  # show first 10 presence, last 10 absence
+  slice(c(1:10, (nrow(pts_env)-9):nrow(pts_env))) %>% 
+  DT::datatable(
+    rownames = F,
+    options = list(
+      dom = "t",
+      pageLength = 20))
 ```
+
 
 ## 2.5 Term Plots 
 
@@ -251,3 +264,5 @@ pts_env %>%
     legend.position = c(1, 0),
     legend.justification = c(1, 0))
 ```
+
+
