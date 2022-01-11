@@ -43,6 +43,7 @@ GGally::ggpairs(
 d <- pts_env %>% 
   select(-ID) %>%  # remove terms we don't want to model
   tidyr::drop_na() # drop the rows with NA values
+
 nrow(d)
 ```
 
@@ -91,8 +92,8 @@ librarian::shelf(mgcv)
 
 # fit a generalized additive model with smooth predictors
 mdl <- mgcv::gam(
-  formula = present ~ s(WC_alt) + s(WC_bio1) + 
-    s(WC_bio2) + s(ER_tri) + s(ER_topoWet) + s(lon) + s(lat), 
+  formula = present ~ s(WC_alt, k=5) + s(WC_bio1, k=5) + 
+    s(WC_bio2, k=5) + s(ER_tri, k=5) + s(ER_topoWet, k=5), # + s(lon, k=5) + s(lat, k=5), 
   family = binomial, data = d)
 summary(mdl)
 ```
