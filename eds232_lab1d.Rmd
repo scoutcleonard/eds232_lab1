@@ -1,0 +1,102 @@
+---
+title: "Lab 1d. Species Distribution Modeling - Evaluate Models"
+author: "Scout Leonard"
+date: "1/12/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setup
+
+```{r}
+# global knitr chunk options
+knitr::opts_chunk$set(
+  warning = FALSE, 
+  message = FALSE)
+
+# load packages
+librarian::shelf(
+  dismo, # species distribution modeling: maxent(), predict(), evaluate(), 
+  dplyr, ggplot2, GGally, here, maptools, readr, 
+  raster, readr, rsample, sf,
+  usdm)  # uncertainty analysis for species distribution models: vifcor()
+select = dplyr::select
+
+# options
+set.seed(42)
+options(
+  scipen = 999,
+  readr.show_col_types = F)
+ggplot2::theme_set(ggplot2::theme_light())
+
+# paths
+dir_data      <- here("data/sdm")
+pts_geo       <- file.path(dir_data, "pts.geojson")
+env_stack_grd <- file.path(dir_data, "env_stack.grd")
+mdl_maxv_rds  <- file.path(dir_data, "mdl_maxent_vif.rds")
+
+# read points of observation: presence (1) and absence (0)
+pts <- read_sf(pts_geo)
+
+# read raster stack of environment
+env_stack <- raster::stack(env_stack_grd)
+```
+
+## 1.1 Split observations into training and testing
+
+```{r}
+# create training set with 80% of full data
+pts_split  <- rsample::initial_split(
+  pts, prop = 0.8, strata = "present")
+pts_train  <- rsample::training(pts_split)
+pts_test   <- rsample::testing(pts_split)
+
+pts_train_p <- pts_train %>% 
+  filter(present == 1) %>% 
+  as_Spatial()
+pts_train_a <- pts_train %>% 
+  filter(present == 0) %>% 
+  as_Spatial()
+```
+
+# 2. Calibrate: Model Selection
+
+```{r}
+# show pairs plot before multicollinearity reduction with vifcor()
+pairs(env_stack)
+```
+
+```{r}
+# calculate variance inflation factor per predictor, a metric of multicollinearity between variables
+vif(env_stack)
+```
+
+```{r}
+# stepwise reduce predictors, based on a max correlation of 0.7 (max 1)
+v <- vifcor(env_stack, th=0.7) 
+v
+```
+
+```{r}
+# reduce enviromental raster stack by 
+env_stack_v <- usdm::exclude(env_stack, v)
+
+# show pairs plot after multicollinearity reduction with vifcor()
+pairs(env_stack_v)
+```
+
+```{r}
+# fit a maximum entropy model
+if (!file.exists(mdl_maxv_rds)){
+  mdl_maxv <- maxent(env_stack_v, pts_train)
+  readr::write_rds(mdl_maxv, mdl_maxv_rds)
+}
+mdl_maxv <- read_rds(mdl_maxv_rds)
+
+# plot variable contributions per predictor
+plot(mdl_maxv)
+```
+
