@@ -91,10 +91,18 @@ termplot(mdl, partial.resid = TRUE, se = TRUE, main = F, ylim="free")
 librarian::shelf(mgcv)
 
 # fit a generalized additive model with smooth predictors
+# NOTE: only worked on taylor after upgrading mgcv to latest version 1.8-38; previously got Error: can't correct step size 
 mdl <- mgcv::gam(
-  formula = present ~ s(WC_alt, k=5) + s(WC_bio1, k=5) + 
-    s(WC_bio2, k=5) + s(ER_tri, k=5) + s(ER_topoWet, k=5), # + s(lon, k=5) + s(lat, k=5), 
+  formula = present ~ s(WC_alt) + s(WC_bio1) + 
+    s(WC_bio2) + s(ER_tri) + s(ER_topoWet) + s(lon) + s(lat), 
   family = binomial, data = d)
+
+# OLD: Ben trying out model constraining the terms by 5 knots each
+# mdl <- mgcv::gam(
+#   formula = present ~ s(WC_alt, k=5) + s(WC_bio1, k=5) + 
+#     s(WC_bio2, k=5) + s(ER_tri, k=5) + s(ER_topoWet, k=5), # + s(lon, k=5) + s(lat, k=5), 
+#   family = binomial, data = d)
+
 summary(mdl)
 ```
 
